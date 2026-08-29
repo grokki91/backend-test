@@ -1,10 +1,11 @@
-package com.example.backendtest;
+package com.example.backendtest.auth;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+
+import com.example.backendtest.common.ApiException;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -13,14 +14,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * Rejects requests to protected routes without a valid Bearer token and exposes
- * the caller's id and role as request attributes.
+ * Rejects protected routes without a valid Bearer token and publishes the caller's
+ * id and role as request attributes for controllers to authorize against.
  */
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
 
     public static final String USER_ID = "userId";
     public static final String ROLE = "role";
+    public static final String EMAIL = "email";
 
     private static final String BEARER_PREFIX = "Bearer ";
 
@@ -37,16 +39,17 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (header == null || !header.startsWith(BEARER_PREFIX)) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Missing or malformed Authorization header");
+            throw ApiException.unauthorized("Missing or malformed Authorization header");
         }
         try {
             Claims claims = jwtService.parse(header.substring(BEARER_PREFIX.length()).trim());
             request.setAttribute(USER_ID, ((Number) claims.get("uid")).longValue());
             request.setAttribute(ROLE, String.valueOf(claims.get(ROLE)));
+            request.setAttribute(EMAIL, claims.getSubject());
         } catch (ExpiredJwtException e) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Token expired");
-        } catch (JwtException | IllegalArgumentException e) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid token");
+            throw ApiException.unauthorized("Token expired");
+        } catch (JwtException | IllegalArgumentException | NullPointerException e) {
+            throw ApiException.unauthorized("Invalid token");
         }
         return true;
     }

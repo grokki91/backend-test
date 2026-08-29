@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/shipping/quote"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "destination": "{{request.query.destination}}",
+      "cost": 12.5,
+      "currency": "EUR",
+      "etaDays": 3
+    },
+    "transformers": ["response-template"]
+  }
+}

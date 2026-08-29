@@ -1,4 +1,4 @@
-package com.example.backendtest;
+package com.example.backendtest.user;
 
 import java.util.Optional;
 

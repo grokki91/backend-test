@@ -1,6 +1,8 @@
-package com.example.backendtest;
+package com.example.backendtest.user;
 
 import java.time.Instant;
+
+import com.example.backendtest.common.Timestamps;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,26 +28,30 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
-    private String password;
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
 
     private Integer age;
 
     @Column(nullable = false)
     private String role = ROLE_USER;
 
-    @Column(nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt = Timestamps.now();
 
     protected User() {
     }
 
-    public User(String name, String email, String password, Integer age, String role) {
+    public User(String name, String email, String passwordHash, Integer age, String role) {
         this.name = name;
         this.email = email;
-        this.password = password;
+        this.passwordHash = passwordHash;
         this.age = age;
         this.role = role;
+    }
+
+    public boolean isAdmin() {
+        return ROLE_ADMIN.equals(role);
     }
 
     public Long getId() {
@@ -68,12 +74,12 @@ public class User {
         this.email = email;
     }
 
-    public String getPassword() {
-        return password;
+    public String getPasswordHash() {
+        return passwordHash;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public Integer getAge() {

@@ -1,8 +1,8 @@
-package com.example.backendtest;
+package com.example.backendtest.user;
 
 import java.time.Instant;
 
-/** Public view of a user — never carries the password hash. */
+/** v1 view of a user. Never carries the password hash. */
 public record UserResponse(Long id, String name, String email, Integer age, String role, Instant createdAt) {
 
     public static UserResponse from(User user) {

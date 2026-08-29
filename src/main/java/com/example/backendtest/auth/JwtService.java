@@ -1,4 +1,4 @@
-package com.example.backendtest;
+package com.example.backendtest.auth;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -29,14 +29,19 @@ public class JwtService {
         return ttlSeconds;
     }
 
-    public String generate(User user) {
+    public String generate(Long userId, String email, String role) {
+        return generate(userId, email, role, ttlSeconds);
+    }
+
+    /** The explicit lifetime overload exists so tests can mint a token that expires in seconds. */
+    public String generate(Long userId, String email, String role, long lifetimeSeconds) {
         Instant now = Instant.now();
         return Jwts.builder()
-                .subject(user.getEmail())
-                .claim("uid", user.getId())
-                .claim("role", user.getRole())
+                .subject(email)
+                .claim("uid", userId)
+                .claim("role", role)
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(ttlSeconds)))
+                .expiration(Date.from(now.plusSeconds(lifetimeSeconds)))
                 .signWith(key)
                 .compact();
     }
