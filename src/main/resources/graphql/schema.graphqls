@@ -1,0 +1,39 @@
+scalar BigDecimal
+
+enum OrderStatus {
+    NEW
+    PAID
+    SHIPPED
+    DELIVERED
+    CANCELLED
+}
+
+type User {
+    id: ID!
+    name: String!
+    email: String!
+    age: Int
+    role: String!
+}
+
+type Order {
+    id: ID!
+    userId: ID!
+    status: OrderStatus!
+    amount: BigDecimal!
+    currency: String!
+    comment: String
+    version: Int!
+}
+
+type Query {
+    users(page: Int, size: Int): [User!]!
+    user(id: ID!): User
+    orders(status: OrderStatus, page: Int, size: Int): [Order!]!
+    order(id: ID!): Order
+}
+
+type Mutation {
+    createOrder(userId: ID!, amount: BigDecimal!, currency: String!, comment: String): Order!
+    cancelOrder(id: ID!): Order!
+}

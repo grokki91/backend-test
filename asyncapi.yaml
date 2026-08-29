@@ -1,0 +1,92 @@
+asyncapi: 3.0.0
+
+info:
+  title: backend-test events
+  version: 1.0.0
+  description: >
+    Every order state change is published twice: to the Kafka topic other services would
+    consume, and to the RabbitMQ queue a notification worker would drain.
+
+servers:
+  kafka:
+    host: localhost:9092
+    protocol: kafka
+  rabbitmq:
+    host: localhost:5672
+    protocol: amqp
+
+channels:
+  orderEvents:
+    address: orders.events
+    servers: [{ $ref: '#/servers/kafka' }]
+    description: Order lifecycle events, keyed by order id so one order keeps its ordering.
+    messages:
+      orderEvent: { $ref: '#/components/messages/orderEvent' }
+
+  orderEventsDeadLetter:
+    address: orders.events.DLT
+    servers: [{ $ref: '#/servers/kafka' }]
+    description: Where a record lands after the initial delivery and two retries all fail.
+    messages:
+      orderEvent: { $ref: '#/components/messages/orderEvent' }
+
+  notifications:
+    address: notifications.queue
+    servers: [{ $ref: '#/servers/rabbitmq' }]
+    description: Bound to notifications.exchange with routing key notifications.order.
+    messages:
+      orderEvent: { $ref: '#/components/messages/orderEvent' }
+
+  notificationsDeadLetter:
+    address: notifications.queue.dlq
+    servers: [{ $ref: '#/servers/rabbitmq' }]
+    description: Rejected notifications, routed here through notifications.dlx.
+    messages:
+      orderEvent: { $ref: '#/components/messages/orderEvent' }
+
+operations:
+  publishOrderEvent:
+    action: send
+    channel: { $ref: '#/channels/orderEvents' }
+  consumeOrderEvent:
+    action: receive
+    channel: { $ref: '#/channels/orderEvents' }
+  consumeNotification:
+    action: receive
+    channel: { $ref: '#/channels/notifications' }
+
+components:
+  messages:
+    orderEvent:
+      name: OrderEvent
+      contentType: application/json
+      payload:
+        type: object
+        required: [eventId, type, orderId, userId, status, amount, currency, occurredAt]
+        properties:
+          eventId:
+            type: string
+            format: uuid
+            description: Dedupe key. Consumers record it, so redelivery is a no-op.
+          type:
+            type: string
+            enum:
+              - order.created
+              - order.updated
+              - order.paid
+              - order.shipped
+              - order.delivered
+              - order.cancelled
+              - order.poison
+            description: order.poison is always rejected, to exercise retries and the DLQ.
+          orderId: { type: integer, format: int64 }
+          userId: { type: integer, format: int64 }
+          status:
+            type: string
+            enum: [NEW, PAID, SHIPPED, DELIVERED, CANCELLED]
+          amount: { type: number }
+          currency: { type: string, minLength: 3, maxLength: 3 }
+          correlationId:
+            type: string
+            description: Carries the X-Correlation-Id of the request that caused the event.
+          occurredAt: { type: string, format: date-time }
