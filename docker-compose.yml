@@ -1,0 +1,11 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-local-dev-secret-change-me-at-least-32-chars}
+      JWT_TTL_MINUTES: ${JWT_TTL_MINUTES:-60}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
