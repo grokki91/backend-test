@@ -1,0 +1,937 @@
+{
+  "info": {
+    "name": "backend-test",
+    "description": "Ручное тестирование backend-test API. Импортируй коллекцию, подними стек (`docker compose up -d --build`) и жми запросы по порядку сверху вниз внутри каждой папки — токены, id заказов и вебхуков подхватываются автоматически через test-скрипты в переменные коллекции.\n\nТестовые пользователи: admin@test.com/admin123 (ADMIN), alice@test.com/alice123, bob@test.com/bob12345, carol@test.com/carol123 (USER). OAuth client_credentials: test-client/test-secret.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "tokenAlice", "value": "" },
+    { "key": "tokenBob", "value": "" },
+    { "key": "tokenAdmin", "value": "" },
+    { "key": "tokenClient", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "orderEtag", "value": "" },
+    { "key": "secondOrderId", "value": "" },
+    { "key": "newUserId", "value": "" },
+    { "key": "webhookId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Health & Actuator",
+      "item": [
+        {
+          "name": "GET /api/health (без токена)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/health", "host": ["{{baseUrl}}"], "path": ["api", "health"] }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /actuator/health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "POST /auth/register (новый юзер)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Tester\",\n  \"email\": \"postman.tester+{{$timestamp}}@test.com\",\n  \"password\": \"tester123\",\n  \"age\": 30\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "register"] },
+            "description": "Ожидаем 201 и роль USER. Повтори с тем же email второй раз — жди 409/400 на дубликат."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login (alice)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenAlice', data.token);",
+                  "pm.test('200 и токен получен', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(data.token).to.be.a('string');",
+                  "    pm.expect(data.role).to.eql('USER');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@test.com\",\n  \"password\": \"alice123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login"] }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login (bob)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenBob', data.token);",
+                  "pm.test('200 и токен получен', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob@test.com\",\n  \"password\": \"bob12345\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login"] }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenAdmin', data.token);",
+                  "pm.test('200 и роль ADMIN', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(data.role).to.eql('ADMIN');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@test.com\",\n  \"password\": \"admin123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login"] }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login (короткий TTL, test hook)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@test.com\",\n  \"password\": \"alice123\",\n  \"expiresInSeconds\": 5\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login"] },
+            "description": "Подожди 5+ секунд и вызови /auth/me с этим токеном — жди 401, чтобы вручную проверить истечение JWT."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/token (OAuth client_credentials)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('tokenClient', data.token);",
+                  "pm.test('200 и роль ADMIN у сервисного токена', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(data.role).to.eql('ADMIN');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "client_credentials" },
+                { "key": "client_id", "value": "test-client" },
+                { "key": "client_secret", "value": "test-secret" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/token", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "token"] }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /auth/me (alice)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "me"] }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /auth/me (без токена -> 401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "me"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Users v1",
+      "item": [
+        {
+          "name": "GET /users (список, alice)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users?page=0&size=10&sort=id,asc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" },
+                { "key": "sort", "value": "id,asc" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /users?name= (фильтр)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users?name=ali",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"],
+              "query": [{ "key": "name", "value": "ali" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /users (создать, admin -> 201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('newUserId', pm.response.json().id);",
+                  "}",
+                  "pm.test('201 Created', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dave\",\n  \"email\": \"dave+{{$timestamp}}@test.com\",\n  \"password\": \"dave1234\",\n  \"age\": 25\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/users", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users"] }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /users (создать, alice -> 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAlice}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Eve\",\n  \"email\": \"eve+{{$timestamp}}@test.com\",\n  \"password\": \"eve12345\",\n  \"age\": 22\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/users", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users"] },
+            "description": "Не-ADMIN не может создавать пользователей. Ожидаем 403."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /users/{{newUserId}}",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/users/{{newUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "{{newUserId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /users/self (alice меняет себя)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAlice}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice Updated\",\n  \"email\": \"alice@test.com\",\n  \"age\": 29\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/users/1", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "1"] },
+            "description": "Подставь реальный id alice (обычно 2 — смотри /auth/me). PUT требует все поля."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /users/{{newUserId}} (частичное обновление, admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAdmin}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"age\": 26\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/users/{{newUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "{{newUserId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /users/{{newUserId}} (bob чужого юзера -> 403)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenBob}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"age\": 99\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/users/{{newUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "{{newUserId}}"] },
+            "description": "Broken access control: bob редактирует не свой профиль. Ожидаем 403."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /users/{{newUserId}} (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/users/{{newUserId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "users", "{{newUserId}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Users v2",
+      "item": [
+        {
+          "name": "GET /api/v2/users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v2/users", "host": ["{{baseUrl}}"], "path": ["api", "v2", "users"] }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v2/users/1",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v2/users/1", "host": ["{{baseUrl}}"], "path": ["api", "v2", "users", "1"] },
+            "description": "Сравни форму ответа с v1/users/1 — та же сущность, другой контракт."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Orders",
+      "item": [
+        {
+          "name": "POST /orders (create, Idempotency-Key)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('orderId', data.id);",
+                  "pm.collectionVariables.set('orderEtag', pm.response.headers.get('ETag'));",
+                  "pm.test('201 Created, статус NEW', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    pm.expect(data.status).to.eql('NEW');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAlice}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "postman-demo-key-1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 42.50,\n  \"currency\": \"USD\",\n  \"comment\": \"Собрано руками через Postman\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders"] }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /orders (тот же Idempotency-Key -> replay)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 + Idempotency-Replayed: true, id не изменился', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get('Idempotency-Replayed')).to.eql('true');",
+                  "    pm.expect(pm.response.json().id).to.eql(parseInt(pm.collectionVariables.get('orderId')));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAlice}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "postman-demo-key-1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 42.50,\n  \"currency\": \"USD\",\n  \"comment\": \"Собрано руками через Postman\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders"] },
+            "description": "Тот же ключ, то же тело -> сервер не создаёт второй заказ, отдаёт исходный с заголовком Idempotency-Replayed: true."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /orders (второй заказ, для негативных сценариев)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('secondOrderId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAlice}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "postman-demo-key-2" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 10.00,\n  \"currency\": \"EUR\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders"] }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /orders?status=NEW",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders?status=NEW&page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"],
+              "query": [
+                { "key": "status", "value": "NEW" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /orders/{{orderId}} (обновляет ETag)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('orderEtag', pm.response.headers.get('ETag'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /orders/{{orderId}} (bob, чужой заказ -> 403)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenBob}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /orders/{{orderId}} (с верным If-Match)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('orderEtag', pm.response.headers.get('ETag'));",
+                  "}",
+                  "pm.test('200 OK', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAlice}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "If-Match", "value": "{{orderEtag}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 55.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /orders/{{orderId}} (устаревший If-Match -> 409)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAlice}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "If-Match", "value": "\"0\"" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 999.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}"] },
+            "description": "Заведомо устаревшая версия — проверка оптимистичной блокировки. Ожидаем 409."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /orders/{{orderId}}/pay",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/pay", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}", "pay"] }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /orders/{{orderId}}/ship (alice -> 403)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/ship", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}", "ship"] },
+            "description": "ship — только ADMIN. Ожидаем 403."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /orders/{{orderId}}/ship (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/ship", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}", "ship"] }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /orders/{{secondOrderId}}/deliver (до ship -> 409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{secondOrderId}}/deliver", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{secondOrderId}}", "deliver"] },
+            "description": "Второй заказ ещё в NEW. deliver допустим только из SHIPPED -> недопустимый переход, ожидаем 409."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /orders/{{orderId}}/deliver (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/deliver", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}", "deliver"] }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /orders/{{secondOrderId}}/cancel (из NEW)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{secondOrderId}}/cancel", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{secondOrderId}}", "cancel"] }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /orders/{{orderId}}/poison (admin, DLQ/DLT)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/poison", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}", "poison"] },
+            "description": "202 Accepted. После этого руками проверь RabbitMQ UI (notifications.queue.dlq) и Kafka (orders.events.DLT) — оба консьюмера должны отклонить событие после ретраев."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /orders/notifications (что реально долетело в RabbitMQ-воркер)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/notifications", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "notifications"] }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /orders/subscribers (счётчик SSE/WS подписчиков)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/subscribers", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "subscribers"] }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /orders/{{secondOrderId}} (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAdmin}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{secondOrderId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{secondOrderId}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Webhooks",
+      "item": [
+        {
+          "name": "GET /webhooks",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/webhooks", "host": ["{{baseUrl}}"], "path": ["api", "v1", "webhooks"] }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /webhooks (подписка на webhook.site)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('webhookId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAlice}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetUrl\": \"https://webhook.site/REPLACE-WITH-YOUR-UUID\",\n  \"eventType\": \"order.paid\",\n  \"secret\": \"postman-secret\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/webhooks", "host": ["{{baseUrl}}"], "path": ["api", "v1", "webhooks"] },
+            "description": "Замени targetUrl на свой личный урл с https://webhook.site, потом сделай /pay или /cancel над заказом и проверь на webhook.site, что запрос долетел."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /webhooks/{{webhookId}}",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenAlice}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/webhooks/{{webhookId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "webhooks", "{{webhookId}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Shipping & Chaos",
+      "item": [
+        {
+          "name": "GET /shipping/quote",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/shipping/quote?destination=berlin",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "shipping", "quote"],
+              "query": [{ "key": "destination", "value": "berlin" }]
+            },
+            "description": "Отвечает WireMock. Чтобы проверить деградацию — застабь в WireMock admin (http://localhost:8081/__admin) задержку/500 на этот путь и повтори запрос."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /chaos/slow?ms=3000",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chaos/slow?ms=3000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chaos", "slow"],
+              "query": [{ "key": "ms", "value": "3000" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /chaos/status?code=503",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chaos/status?code=503",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chaos", "status"],
+              "query": [{ "key": "code", "value": "503" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /chaos/flaky?failureRate=0.5",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chaos/flaky?failureRate=0.5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chaos", "flaky"],
+              "query": [{ "key": "failureRate", "value": "0.5" }]
+            },
+            "description": "Жми Send несколько раз подряд руками — примерно половина ответов должна быть 503."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /chaos/payload?bytes=1000000",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/chaos/payload?bytes=1000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "chaos", "payload"],
+              "query": [{ "key": "bytes", "value": "1000000" }]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. GraphQL",
+      "item": [
+        {
+          "name": "POST /graphql — query orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAlice}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { orders(status: NEW, page: 0, size: 10) { id status amount currency version } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] },
+            "description": "Живой конструктор запросов — GraphiQL на {{baseUrl}}/graphiql."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /graphql — mutation createOrder",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAlice}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation($userId: ID!, $amount: BigDecimal!, $currency: String!) { createOrder(userId: $userId, amount: $amount, currency: $currency, comment: \\\"via GraphQL\\\") { id status amount currency } }\",\n  \"variables\": { \"userId\": \"2\", \"amount\": 15.00, \"currency\": \"USD\" }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] },
+            "description": "userId=2 обычно alice — свериться можно через GET /api/v1/auth/me."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. SOAP",
+      "item": [
+        {
+          "name": "GET /soap/orders.wsdl",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/soap/orders.wsdl", "host": ["{{baseUrl}}"], "path": ["soap", "orders.wsdl"] }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /soap/orders — GetOrderRequest",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "text/xml; charset=utf-8" }],
+            "body": {
+              "mode": "raw",
+              "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:ord=\"http://example.com/backendtest/orders\">\n  <soapenv:Header/>\n  <soapenv:Body>\n    <ord:GetOrderRequest>\n      <ord:id>{{orderId}}</ord:id>\n    </ord:GetOrderRequest>\n  </soapenv:Body>\n</soapenv:Envelope>",
+              "options": { "raw": { "language": "xml" } }
+            },
+            "url": { "raw": "{{baseUrl}}/soap/orders", "host": ["{{baseUrl}}"], "path": ["soap", "orders"] },
+            "description": "Запроси id, которого нет (например 999999) — прилетит SOAP Fault (OrderNotFoundFault)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "9. WebSocket & SSE (руками, вне Postman)",
+      "item": [
+        {
+          "name": "SSE: GET /orders/stream",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{tokenAlice}}" },
+              { "key": "Accept", "value": "text/event-stream" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/stream", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "stream"] },
+            "description": "В Postman ответ будет копиться, пока держится соединение (или используй Postman's 'Send and Download'). Надёжнее вручную: curl -N \"{{baseUrl}}/api/v1/orders/stream\" -H \"Authorization: Bearer <token>\". Держи открытым и в другом окне создавай/меняй заказ — событие должно появиться в потоке."
+          },
+          "response": []
+        },
+        {
+          "name": "WS: ws://localhost:8080/ws/orders (описание)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "ws://localhost:8080/ws/orders", "host": ["ws:", "", "localhost:8080"], "path": ["ws", "orders"] },
+            "description": "Формат collection v2.1 не переносит WebSocket-запросы между версиями Postman надёжно. Открой вручную: Postman -> New -> WebSocket Request -> ws://localhost:8080/ws/orders -> Connect. Либо из терминала: wscat -c ws://localhost:8080/ws/orders. В другом окне выполни действие над заказом (например /pay) и проверь, что событие пришло в сокет."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "10. Rate limit (ручной burst-тест)",
+      "item": [
+        {
+          "name": "GET /shipping/quote — прогони Runner-ом 110x за 60с",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/shipping/quote", "host": ["{{baseUrl}}"], "path": ["api", "v1", "shipping", "quote"] },
+            "description": "По умолчанию лимит 100 запросов / 60 сек. Открой Postman Collection Runner, выбери только этот запрос, Iterations=110, Delay=0 — после 100-го ответа жди 429 и заголовки X-RateLimit-Remaining=0, Retry-After."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
